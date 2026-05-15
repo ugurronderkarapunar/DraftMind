@@ -76,7 +76,7 @@ st.title("Takım Kompozisyonu Analizi")
 all_champs = get_champions()
 all_names = sorted([c['name'] for c in all_champs])
 
-# ---------- session state başlangıç (eğer yoksa) ----------
+# session state başlangıç
 for key in ['enemy_picks', 'ally_picks', 'pool', 'use_pool', 'role_filter']:
     if key not in st.session_state:
         st.session_state[key] = [] if key in ['enemy_picks','ally_picks','pool'] else (False if key=='use_pool' else 'Any')
@@ -87,43 +87,46 @@ role_filter = st.selectbox("Hangi koridorda oynayacaksın?", ["Any","Top","Jungl
                            key='role_filter_sel')
 st.session_state.role_filter = role_filter
 
-# ---------- kendi havuzu (opsiyonel) ----------
-use_pool = st.checkbox("Sadece kendi oynadığım şampiyonları öner", value=st.session_state.use_pool)
-st.session_state.use_pool = use_pool
-if use_pool:
-    pool = st.multiselect("Şampiyon havuzun", all_names, default=st.session_state.pool)
-    st.session_state.pool = pool
-else:
-    st.session_state.pool = []
-
-# ---------- seçilmişleri takip için yardımcı fonksiyon ----------
+# ---------- yardımcı: seçili seti döndür ----------
 def get_selected_set(exclude_key=None, exclude_idx=None):
-    """Tüm dropdownlarda seçilmiş şampiyonları küme olarak döndür,
-    istenirse belirli bir key/index'i hariç tut."""
     selected = set()
+    # düşman
     for i in range(5):
         val = st.session_state.get(f"enemy_{i}", "")
         if val and not (exclude_key == 'enemy' and exclude_idx == i):
             selected.add(val)
+    # dost
     for i in range(4):
         val = st.session_state.get(f"ally_{i}", "")
         if val and not (exclude_key == 'ally' and exclude_idx == i):
             selected.add(val)
+    # havuz
+    pool = st.session_state.get("pool", [])
+    for val in pool:
+        selected.add(val)
     return selected
+
+# ---------- kendi havuzu ----------
+use_pool = st.checkbox("Sadece kendi oynadığım şampiyonları öner", value=st.session_state.use_pool)
+st.session_state.use_pool = use_pool
+if use_pool:
+    # havuzda gösterilebilecekler: tüm şampiyonlar eksi düşman/dost seçimleri (havuzun kendisini çıkarmaya gerek yok)
+    pool_available = [name for name in all_names if name not in get_selected_set()]
+    current_pool = [name for name in st.session_state.pool if name in pool_available]
+    pool = st.multiselect("Şampiyon havuzun", pool_available, default=current_pool)
+    st.session_state.pool = pool
+else:
+    st.session_state.pool = []
 
 # ---------- düşman takımı ----------
 st.subheader("Düşman Takımı (5 şampiyon)")
 enemy_picks = []
 for i in range(5):
-    # Mevcut seçimi koru
     current_val = st.session_state.get(f"enemy_{i}", "")
-    # Kullanılabilir seçenekler: tüm şampiyonlar - diğer kutularda seçilmiş olanlar
     available = [""] + [name for name in all_names if name not in get_selected_set(exclude_key='enemy', exclude_idx=i) or name == current_val]
-    # Eğer current_val artık available'da yoksa sıfırla
     if current_val and current_val not in available:
         current_val = ""
     choice = st.selectbox(f"Düşman {i+1}", available, index=available.index(current_val) if current_val in available else 0, key=f"enemy_{i}_sel")
-    # session state'e kaydet
     st.session_state[f"enemy_{i}"] = choice
     if choice:
         enemy_picks.append(choice)
@@ -141,7 +144,7 @@ for i in range(4):
     if choice:
         ally_picks.append(choice)
 
-# ---------- analiz butonu ----------
+# ---------- analiz ----------
 if st.button("Analiz Et"):
     if len(enemy_picks) != 5:
         st.error("Düşman takımında tam 5 şampiyon seçmelisiniz.")
@@ -210,7 +213,6 @@ if st.button("Analiz Et"):
                     else:
                         st.caption("Genel denge tercihi")
                 with col2:
-                    # geri bildirim butonları
                     fb_key = f"fb_{champ['name']}"
                     if fb_key not in st.session_state:
                         st.session_state[fb_key] = None
@@ -226,6 +228,6 @@ if st.button("Analiz Et"):
                     elif st.session_state[fb_key] == "dislike":
                         st.info("👎")
 
-            # başarılı analiz tamamlandı, hakkı düş
+            # başarılı analiz hakkı
             if not user['is_pro']:
                 increment_usage(user['id'])
