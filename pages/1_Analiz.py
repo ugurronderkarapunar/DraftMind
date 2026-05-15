@@ -1,6 +1,7 @@
 import streamlit as st
 from db_utils import get_champions, check_daily_limit, increment_usage, save_feedback
 
+# ---------- yardımcı fonksiyonlar ----------
 def analyze_enemy_weaknesses(enemy_champs):
     avg_early = sum(c['early_power'] for c in enemy_champs) / 5
     total_cc = sum(c['cc_level'] for c in enemy_champs)
@@ -22,28 +23,20 @@ def analyze_enemy_weaknesses(enemy_champs):
     return weaknesses
 
 def ally_synergy_bonus(champ, ally_champs):
-    """Dost takımla basit sinerji bonusu: CC ağırlıklı dostlar varsa burst, tank dost varsa koruma vb."""
     bonus = 0
     ally_cc = sum(a['cc_level'] for a in ally_champs)
     ally_tank = sum(a['tankiness'] for a in ally_champs)
     ally_burst = sum(a['burst'] for a in ally_champs)
-
-    # Eğer dost takımda yüksek CC varsa, yeni şampiyonun burst'ü değerli
     if ally_cc >= 8:
         bonus += champ['burst'] * 1.5
-    # Dost takımda tank yoksa, dayanıklı şampiyonlar tercih edilsin
     if ally_tank <= 3:
         bonus += champ['tankiness'] * 2
-    # Eğer dost takımda yüksek burst varsa, daha fazla CC veya koruma iyi olur
     if ally_burst >= 12:
-        bonus += champ['cc_level'] * 1.5
-        bonus += champ['tankiness'] * 1.0
-
+        bonus += champ['cc_level'] * 1.5 + champ['tankiness'] * 1.0
     return bonus
 
 def score_champion(champ, weaknesses, ally_champs):
     score = 0
-    # Temel zayıflıklara göre puan
     for w_type, _ in weaknesses:
         if w_type == 'weak_early':
             score += champ['early_power'] * 2
@@ -59,13 +52,11 @@ def score_champion(champ, weaknesses, ally_champs):
             score += champ['mobility'] * 2 + champ['burst'] * 2
         elif w_type == 'squishy':
             score += champ['burst'] * 3 + champ['mobility'] * 1.5
-
-    # Dost sinerjisi ekle
     if ally_champs:
         score += ally_synergy_bonus(champ, ally_champs)
     return score
 
-# ---------- Ana sayfa giriş kontrolü ----------
+# ---------- oturum kontrolü ----------
 if 'user' not in st.session_state or st.session_state.user is None:
     st.warning("Lütfen ana sayfadan giriş yap.")
     st.stop()
@@ -81,52 +72,84 @@ if not user['is_pro']:
 
 st.title("Takım Kompozisyonu Analizi")
 
-# ---------- Rol seçimi ----------
-st.subheader("Kendi Pozisyonun")
-role_filter = st.selectbox(
-    "Hangi koridorda oynayacaksın?",
-    ["Any", "Top", "Jungle", "Mid", "ADC", "Support"]
-)
-
-# ---------- Şampiyon havuzu (opsiyonel) ----------
-use_pool = st.checkbox("Sadece kendi oynadığım şampiyonları öner")
-if use_pool:
-    # Kullanıcı havuzu: tüm şampiyonlar arasından seçim
-    all_champs = get_champions()
-    all_names = sorted([c['name'] for c in all_champs])
-    pool_names = st.multiselect("Şampiyon havuzun", all_names)
-else:
-    pool_names = None
-
-# ---------- Düşman takımı ----------
-st.subheader("Düşman Takımı (5 şampiyon)")
+# ---------- veri hazırlığı ----------
 all_champs = get_champions()
-champ_names = sorted([c['name'] for c in all_champs])
+all_names = sorted([c['name'] for c in all_champs])
+
+# ---------- session state başlangıç (eğer yoksa) ----------
+for key in ['enemy_picks', 'ally_picks', 'pool', 'use_pool', 'role_filter']:
+    if key not in st.session_state:
+        st.session_state[key] = [] if key in ['enemy_picks','ally_picks','pool'] else (False if key=='use_pool' else 'Any')
+
+# ---------- rol seçimi ----------
+st.subheader("Kendi Pozisyonun")
+role_filter = st.selectbox("Hangi koridorda oynayacaksın?", ["Any","Top","Jungle","Mid","ADC","Support"],
+                           key='role_filter_sel')
+st.session_state.role_filter = role_filter
+
+# ---------- kendi havuzu (opsiyonel) ----------
+use_pool = st.checkbox("Sadece kendi oynadığım şampiyonları öner", value=st.session_state.use_pool)
+st.session_state.use_pool = use_pool
+if use_pool:
+    pool = st.multiselect("Şampiyon havuzun", all_names, default=st.session_state.pool)
+    st.session_state.pool = pool
+else:
+    st.session_state.pool = []
+
+# ---------- seçilmişleri takip için yardımcı fonksiyon ----------
+def get_selected_set(exclude_key=None, exclude_idx=None):
+    """Tüm dropdownlarda seçilmiş şampiyonları küme olarak döndür,
+    istenirse belirli bir key/index'i hariç tut."""
+    selected = set()
+    for i in range(5):
+        val = st.session_state.get(f"enemy_{i}", "")
+        if val and not (exclude_key == 'enemy' and exclude_idx == i):
+            selected.add(val)
+    for i in range(4):
+        val = st.session_state.get(f"ally_{i}", "")
+        if val and not (exclude_key == 'ally' and exclude_idx == i):
+            selected.add(val)
+    return selected
+
+# ---------- düşman takımı ----------
+st.subheader("Düşman Takımı (5 şampiyon)")
 enemy_picks = []
 for i in range(5):
-    pick = st.selectbox(f"Düşman {i+1}", [""] + champ_names, key=f"enemy_{i}")
-    if pick:
-        enemy_picks.append(pick)
+    # Mevcut seçimi koru
+    current_val = st.session_state.get(f"enemy_{i}", "")
+    # Kullanılabilir seçenekler: tüm şampiyonlar - diğer kutularda seçilmiş olanlar
+    available = [""] + [name for name in all_names if name not in get_selected_set(exclude_key='enemy', exclude_idx=i) or name == current_val]
+    # Eğer current_val artık available'da yoksa sıfırla
+    if current_val and current_val not in available:
+        current_val = ""
+    choice = st.selectbox(f"Düşman {i+1}", available, index=available.index(current_val) if current_val in available else 0, key=f"enemy_{i}_sel")
+    # session state'e kaydet
+    st.session_state[f"enemy_{i}"] = choice
+    if choice:
+        enemy_picks.append(choice)
 
-# ---------- Kendi takımındaki kesinleşmiş pick’ler ----------
+# ---------- dost takımı ----------
 st.subheader("Kendi Takımında Seçilmişler (varsa)")
 ally_picks = []
 for i in range(4):
-    pick = st.selectbox(f"Dost {i+1}", [""] + champ_names, key=f"ally_{i}")
-    if pick:
-        ally_picks.append(pick)
+    current_val = st.session_state.get(f"ally_{i}", "")
+    available = [""] + [name for name in all_names if name not in get_selected_set(exclude_key='ally', exclude_idx=i) or name == current_val]
+    if current_val and current_val not in available:
+        current_val = ""
+    choice = st.selectbox(f"Dost {i+1}", available, index=available.index(current_val) if current_val in available else 0, key=f"ally_{i}_sel")
+    st.session_state[f"ally_{i}"] = choice
+    if choice:
+        ally_picks.append(choice)
 
-# ---------- Analiz butonu ----------
+# ---------- analiz butonu ----------
 if st.button("Analiz Et"):
     if len(enemy_picks) != 5:
         st.error("Düşman takımında tam 5 şampiyon seçmelisiniz.")
     else:
-        # Şampiyon objelerini al
         enemy_data = [next(c for c in all_champs if c['name'] == name) for name in enemy_picks]
         ally_data = [next(c for c in all_champs if c['name'] == name) for name in ally_picks]
         excluded_names = set(enemy_picks + ally_picks)
 
-        # Zayıflıkları bul
         weaknesses = analyze_enemy_weaknesses(enemy_data)
 
         st.subheader("Düşman Zayıflıkları")
@@ -136,16 +159,14 @@ if st.button("Analiz Et"):
         else:
             st.write("Belirgin bir zayıflık tespit edilemedi.")
 
-        # Öneri havuzunu oluştur
-        if pool_names:
-            # Kullanıcı havuzu + rol filtresi
+        # aday havuzu
+        if use_pool and st.session_state.pool:
             candidate_pool = [
                 c for c in all_champs
-                if c['name'] in pool_names and c['name'] not in excluded_names
+                if c['name'] in st.session_state.pool and c['name'] not in excluded_names
                 and (role_filter == "Any" or c['role'] == role_filter)
             ]
         else:
-            # Tüm şampiyonlar, rol filtresi uygula
             candidate_pool = [
                 c for c in all_champs
                 if c['name'] not in excluded_names
@@ -155,7 +176,6 @@ if st.button("Analiz Et"):
         if not candidate_pool:
             st.warning("Seçilebilecek uygun şampiyon kalmadı.")
         else:
-            # Puanlama
             scored = []
             for champ in candidate_pool:
                 s = score_champion(champ, weaknesses, ally_data)
@@ -168,7 +188,6 @@ if st.button("Analiz Et"):
                 col1, col2 = st.columns([0.8, 0.2])
                 with col1:
                     st.markdown(f"**{i}. {champ['name']}** ({champ['role']}) – Puan: {s:.1f}")
-                    # Nedenleri göster
                     reasons = []
                     if any(w[0]=='weak_early' for w in weaknesses) and champ['early_power'] >= 7:
                         reasons.append("erken oyunda baskın")
@@ -191,20 +210,22 @@ if st.button("Analiz Et"):
                     else:
                         st.caption("Genel denge tercihi")
                 with col2:
-                    # Geri bildirim butonları
-                    if f"fb_{champ['name']}" not in st.session_state:
-                        st.session_state[f"fb_{champ['name']}"] = None
-                    if st.button("👍", key=f"like_{champ['name']}"):
+                    # geri bildirim butonları
+                    fb_key = f"fb_{champ['name']}"
+                    if fb_key not in st.session_state:
+                        st.session_state[fb_key] = None
+                    c1, c2 = st.columns(2)
+                    if c1.button("👍", key=f"like_{champ['name']}_{i}"):
                         save_feedback(user['id'], champ['name'], 1)
-                        st.session_state[f"fb_{champ['name']}"] = "like"
-                    if st.button("👎", key=f"dislike_{champ['name']}"):
+                        st.session_state[fb_key] = "like"
+                    if c2.button("👎", key=f"dislike_{champ['name']}_{i}"):
                         save_feedback(user['id'], champ['name'], -1)
-                        st.session_state[f"fb_{champ['name']}"] = "dislike"
-                    if st.session_state[f"fb_{champ['name']}"] == "like":
-                        st.success("Teşekkürler! 👍")
-                    elif st.session_state[f"fb_{champ['name']}"] == "dislike":
-                        st.info("Geri bildirim alındı 👎")
+                        st.session_state[fb_key] = "dislike"
+                    if st.session_state[fb_key] == "like":
+                        st.success("👍")
+                    elif st.session_state[fb_key] == "dislike":
+                        st.info("👎")
 
-            # Başarılı analiz tamamlandı, sayaç artır (Pro değilse)
+            # başarılı analiz tamamlandı, hakkı düş
             if not user['is_pro']:
                 increment_usage(user['id'])
