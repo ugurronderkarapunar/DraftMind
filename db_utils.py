@@ -1,7 +1,9 @@
 import sqlite3
+import hashlib
 from datetime import date
 
 DB_NAME = "lol_pick.db"
+SECRET_SALT = "LoLSuperSecret2026"  # Güvenlik için değiştir
 
 def get_connection():
     conn = sqlite3.connect(DB_NAME)
@@ -9,7 +11,6 @@ def get_connection():
     return conn
 
 def init_db():
-    """Tabloları oluştur ve gerekli index'i ekle."""
     conn = get_connection()
     conn.executescript('''
         CREATE TABLE IF NOT EXISTS champions (
@@ -40,46 +41,74 @@ def init_db():
             count INTEGER DEFAULT 0,
             FOREIGN KEY (user_id) REFERENCES users (id)
         );
+
+        CREATE TABLE IF NOT EXISTS feedback (
+            id INTEGER PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            champion_name TEXT NOT NULL,
+            rating INTEGER NOT NULL, -- 1: beğenme, -1: beğenmeme
+            created_at TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        );
     ''')
-    # UNIQUE kısıtını index ile ekle (tablo zaten varsa sorun çıkarmaz)
     try:
         conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_usage_user_date ON usage(user_id, analysis_date)")
     except sqlite3.OperationalError:
-        # Aynı anda tekrar çalıştırılırsa diye
         pass
     conn.commit()
     conn.close()
 
 def seed_champions():
-    """Eğer champions tablosu boşsa örnek verileri ekle."""
     conn = get_connection()
     existing = conn.execute("SELECT COUNT(*) FROM champions").fetchone()[0]
     if existing == 0:
         sample = [
+            # Top
             ("Aatrox", "Top", "AD", 7, 6, 3, 4, 3, 4, 3),
             ("Malphite", "Top", "AP", 4, 7, 4, 5, 2, 3, 5),
             ("Darius", "Top", "AD", 8, 5, 2, 4, 1, 5, 3),
             ("Ornn", "Top", "Mixed", 5, 8, 5, 5, 1, 2, 5),
-            ("Zed", "Mid", "AD", 6, 5, 1, 1, 5, 5, 1),
-            ("Syndra", "Mid", "AP", 6, 7, 3, 1, 2, 5, 1),
-            ("Viktor", "Mid", "AP", 5, 9, 3, 1, 2, 4, 1),
-            ("Fizz", "Mid", "AP", 4, 8, 2, 2, 5, 5, 2),
-            ("Jhin", "ADC", "AD", 7, 8, 2, 1, 2, 5, 1),
-            ("Kai'Sa", "ADC", "Mixed", 5, 9, 1, 2, 4, 5, 2),
-            ("Miss Fortune", "ADC", "AD", 8, 6, 2, 1, 2, 4, 1),
-            ("Ezreal", "ADC", "Mixed", 5, 7, 1, 1, 4, 4, 1),
-            ("Leona", "Support", "AP", 5, 4, 5, 5, 2, 2, 4),
-            ("Lulu", "Support", "AP", 4, 8, 4, 2, 2, 2, 2),
-            ("Thresh", "Support", "AP", 5, 6, 5, 4, 2, 2, 3),
-            ("Nautilus", "Support", "AP", 5, 5, 5, 5, 1, 2, 4),
+            ("Shen", "Top", "Mixed", 5, 7, 3, 4, 3, 2, 4),
+            ("Garen", "Top", "AD", 7, 6, 1, 5, 2, 4, 4),
+            ("Camille", "Top", "AD", 6, 8, 3, 2, 4, 4, 2),
+            ("Mordekaiser", "Top", "AP", 5, 8, 2, 4, 1, 4, 4),
+            ("Sett", "Top", "AD", 7, 6, 3, 4, 2, 5, 3),
+            # Jungle
             ("Lee Sin", "Jungle", "AD", 8, 4, 3, 3, 4, 4, 3),
             ("Master Yi", "Jungle", "AD", 3, 10, 1, 1, 4, 5, 1),
             ("Sejuani", "Jungle", "AP", 4, 7, 5, 4, 3, 2, 4),
             ("Kha'Zix", "Jungle", "AD", 6, 6, 1, 1, 4, 5, 1),
             ("Amumu", "Jungle", "AP", 3, 8, 5, 4, 2, 2, 4),
+            ("Nidalee", "Jungle", "AP", 7, 5, 1, 1, 5, 4, 1),
+            ("Kayn", "Jungle", "AD", 5, 8, 2, 2, 5, 4, 2),
+            ("Viego", "Jungle", "AD", 6, 7, 1, 3, 4, 5, 2),
+            # Mid
+            ("Zed", "Mid", "AD", 6, 5, 1, 1, 5, 5, 1),
+            ("Syndra", "Mid", "AP", 6, 7, 3, 1, 2, 5, 1),
+            ("Viktor", "Mid", "AP", 5, 9, 3, 1, 2, 4, 1),
+            ("Fizz", "Mid", "AP", 4, 8, 2, 2, 5, 5, 2),
             ("Twisted Fate", "Mid", "AP", 4, 8, 3, 1, 3, 3, 1),
+            ("Yasuo", "Mid", "AD", 7, 8, 3, 1, 4, 5, 1),
+            ("Ahri", "Mid", "AP", 6, 7, 4, 1, 4, 4, 1),
+            ("Katarina", "Mid", "AP", 4, 9, 1, 1, 5, 5, 1),
+            # ADC
+            ("Jhin", "ADC", "AD", 7, 8, 2, 1, 2, 5, 1),
+            ("Kai'Sa", "ADC", "Mixed", 5, 9, 1, 2, 4, 5, 2),
+            ("Miss Fortune", "ADC", "AD", 8, 6, 2, 1, 2, 4, 1),
+            ("Ezreal", "ADC", "Mixed", 5, 7, 1, 1, 4, 4, 1),
             ("Caitlyn", "ADC", "AD", 7, 7, 2, 1, 2, 4, 1),
-            ("Shen", "Top", "Mixed", 5, 7, 3, 4, 3, 2, 4),
+            ("Ashe", "ADC", "AD", 6, 8, 3, 1, 2, 4, 1),
+            ("Lucian", "ADC", "AD", 8, 6, 1, 1, 3, 5, 1),
+            ("Jinx", "ADC", "AD", 5, 10, 2, 1, 2, 5, 1),
+            # Support
+            ("Leona", "Support", "AP", 5, 4, 5, 5, 2, 2, 4),
+            ("Lulu", "Support", "AP", 4, 8, 4, 2, 2, 2, 2),
+            ("Thresh", "Support", "AP", 5, 6, 5, 4, 2, 2, 3),
+            ("Nautilus", "Support", "AP", 5, 5, 5, 5, 1, 2, 4),
+            ("Pyke", "Support", "AD", 6, 5, 4, 1, 5, 5, 1),
+            ("Yuumi", "Support", "AP", 2, 9, 3, 1, 5, 1, 1),
+            ("Blitzcrank", "Support", "AP", 6, 4, 5, 4, 2, 2, 4),
+            ("Soraka", "Support", "AP", 4, 8, 3, 1, 2, 1, 1),
         ]
         conn.executemany(
             "INSERT INTO champions (name, role, damage_type, early_power, late_power, cc_level, tankiness, mobility, burst, armor_mr) "
@@ -92,6 +121,15 @@ def seed_champions():
 def get_champions():
     conn = get_connection()
     rows = conn.execute("SELECT * FROM champions").fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+def get_champions_by_role(role):
+    conn = get_connection()
+    if role and role != "Any":
+        rows = conn.execute("SELECT * FROM champions WHERE role = ?", (role,)).fetchall()
+    else:
+        rows = conn.execute("SELECT * FROM champions").fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
@@ -123,7 +161,6 @@ def check_daily_limit(user_id):
 def increment_usage(user_id):
     today = date.today().isoformat()
     conn = get_connection()
-    # ON CONFLICT artık çalışacak
     conn.execute(
         "INSERT INTO usage (user_id, analysis_date, count) VALUES (?, ?, 1) "
         "ON CONFLICT(user_id, analysis_date) DO UPDATE SET count = count + 1",
@@ -137,3 +174,17 @@ def set_pro(username):
     conn.execute("UPDATE users SET is_pro = 1 WHERE username = ?", (username,))
     conn.commit()
     conn.close()
+
+def save_feedback(user_id, champion_name, rating):
+    conn = get_connection()
+    conn.execute(
+        "INSERT INTO feedback (user_id, champion_name, rating) VALUES (?, ?, ?)",
+        (user_id, champion_name, rating)
+    )
+    conn.commit()
+    conn.close()
+
+def generate_personal_key(username):
+    """Kullanıcıya özel bir aktivasyon anahtarı üretir (güvenlik için özel salt kullan)."""
+    raw = username + SECRET_SALT
+    return hashlib.sha256(raw.encode()).hexdigest()[:12].upper()
