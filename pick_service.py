@@ -27,10 +27,8 @@ class TeamAnalyzer:
             weaknesses.append(('low_cc', 'CC seviyesi düşük'))
         if sum(stats['tank']) < 8:
             weaknesses.append(('squishy', 'Takım dayanıksız'))
-        # Yeni: aşırı mobilite
         if np.mean(stats['mobility']) > 3.5:
             weaknesses.append(('high_mobility', 'Çok hareketli takım, kitle kontrolü şart'))
-        # Yeni: düşük burst
         if sum(stats['burst']) < 12:
             weaknesses.append(('low_burst', 'Ani hasar potansiyeli düşük'))
         return weaknesses
@@ -49,7 +47,6 @@ class TeamAnalyzer:
             bonus += champ['tankiness'] * 2.0
         if ally_burst >= 12:
             bonus += champ['cc_level'] * 1.5 + champ['tankiness'] * 1.0
-        # Yeni: Wombo combo potansiyeli (ör. Orianna + Malphite benzeri)
         if ally_cc >= 10 and champ['cc_level'] >= 4:
             bonus += 3.0
         return bonus
@@ -73,9 +70,9 @@ class TeamAnalyzer:
             elif w_type == 'squishy':
                 score += champ['burst'] * 3.0 + champ['mobility'] * 1.5
             elif w_type == 'high_mobility':
-                score += champ['cc_level'] * 3.0  # CC yüksek olanlar tercih
+                score += champ['cc_level'] * 3.0
             elif w_type == 'low_burst':
-                score += champ['tankiness'] * 2.0  # dayanıklı olup uzun savaş
+                score += champ['tankiness'] * 2.0
         if ally_champs:
             score += TeamAnalyzer.ally_synergy_bonus(champ, ally_champs)
         return score
@@ -97,6 +94,8 @@ class TeamAnalyzer:
                 s = TeamAnalyzer.score_champion_ml(champ, enemy_champs, ally_champs)
                 if s is None:
                     s = TeamAnalyzer.score_champion_rulebased(champ, weaknesses, ally_champs)
+                else:
+                    s = s  # ML skoru direk kullan (ensemble içinde olabilir)
             else:
                 s = TeamAnalyzer.score_champion_rulebased(champ, weaknesses, ally_champs)
             scored.append((champ, s))
