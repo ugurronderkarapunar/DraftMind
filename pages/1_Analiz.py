@@ -24,7 +24,7 @@ def main():
         'bans': [],
         'enemy_roles': {r: "" for r in roles},
         'ally_roles': {r: "" for r in roles},
-        'your_role': 'Top',        # varsayılan bir rol seçilsin, "Any" değil
+        'your_role': 'Top',
         'use_pool': False,
         'pool': [],
         'use_ml': False
@@ -46,7 +46,7 @@ def main():
     # ---------- Rol seçimi (Kendin) ----------
     st.subheader("🎯 Senin Rolün")
     your_role = st.selectbox("Hangi koridorda oynuyorsun?", roles, key="your_role")
-    st.session_state.your_role = your_role
+    # Widget zaten st.session_state.your_role'u güncelledi, manuel atamaya gerek yok.
 
     # ---------- Düşman Takımı ----------
     st.subheader("👾 Düşman Takımı (Rollere göre)")
@@ -71,7 +71,6 @@ def main():
 
     # ---------- Dost Takımı (Sen hariç diğerleri) ----------
     st.subheader("🛡️ Kendi Takımın (Diğer roller)")
-    # Senin rolün dışındaki 4 rolü göster
     ally_roles_to_show = [r for r in roles if r != your_role]
     ally_cols = st.columns(4)
     ally_picks = []
@@ -109,36 +108,27 @@ def main():
 
     # ---------- Analiz ----------
     if st.button("🚀 Analiz Et", type="primary"):
-        # Geçerli seçim kontrolü
         if len(enemy_picks) != 5:
             st.error("Düşman takımında tüm roller seçilmelidir!")
-            return
-
-        if not enemy_picks or len(ally_picks) > 4:
-            st.error("Geçersiz seçim.")
             return
 
         enemy_data = [next(c for c in all_champs if c['name'] == name) for name in enemy_picks]
         ally_data = [next(c for c in all_champs if c['name'] == name) for name in ally_picks]
         excluded_names = set(st.session_state.bans + enemy_picks + ally_picks)
 
-        # Zayıflık analizi
         weaknesses = TeamAnalyzer.analyze_enemy_weaknesses(enemy_data)
 
-        # Aday havuzunu oluştur
         if use_pool and st.session_state.pool:
             candidates = [c for c in all_champs if c['name'] in st.session_state.pool and c['name'] not in excluded_names]
         else:
             candidates = [c for c in all_champs if c['name'] not in excluded_names]
 
-        # Rol filtresi (kullanıcının kendi rolü)
         candidates = [c for c in candidates if c['role'] == your_role]
 
         if not candidates:
             st.warning("Uygun şampiyon kalmadı.")
             return
 
-        # Zayıflıkları göster
         st.subheader("📊 Düşman Zayıflıkları")
         if weaknesses:
             for _, desc in weaknesses:
@@ -146,7 +136,6 @@ def main():
         else:
             st.success("Belirgin zayıflık yok, dengeli bir takım.")
 
-        # Önerileri al
         try:
             top3 = TeamAnalyzer.get_top_picks(candidates, weaknesses, ally_data,
                                               use_ml=st.session_state.use_ml, enemy_champs=enemy_data)
@@ -155,7 +144,6 @@ def main():
             st.error("Öneriler oluşturulurken bir hata oluştu. Lütfen tekrar deneyin.")
             return
 
-        # Görsel öneri kartları
         st.subheader("🏆 En İyi 3 Öneri")
         cols = st.columns(len(top3))
         for i, (champ, score) in enumerate(top3):
@@ -163,12 +151,8 @@ def main():
                 role_emoji = {"Top":"🛡️","Jungle":"🌳","Mid":"🔥","ADC":"🏹","Support":"💚"}.get(champ['role'],"❓")
                 st.markdown(f"### {role_emoji} {champ['name']}")
                 st.metric("Puan", f"{score:.1f}")
-                # Basit nedenler
-                reasons = []
-                # (Nedenleri daha detaylı ekleyebilirsin)
                 st.caption("Uyumlu seçim")
 
-        # Geri bildirim butonları
         st.subheader("Geri Bildirim")
         fb_cols = st.columns(len(top3))
         user = st.session_state.user
@@ -184,7 +168,6 @@ def main():
                         save_feedback(user['id'], champ['name'], -1)
                         st.info("Geri bildirim alındı.")
 
-        # Kullanım hakkını düş
         if not user['is_pro']:
             AuthService.increment_usage(user['id'])
             logger.info(f"Kullanıcı {user['username']} analiz yaptı.")
