@@ -9,7 +9,7 @@ def get_connection():
     return conn
 
 def init_db():
-    """Tabloları oluştur (eğer yoksa)."""
+    """Tabloları oluştur ve gerekli index'i ekle."""
     conn = get_connection()
     conn.executescript('''
         CREATE TABLE IF NOT EXISTS champions (
@@ -41,6 +41,12 @@ def init_db():
             FOREIGN KEY (user_id) REFERENCES users (id)
         );
     ''')
+    # UNIQUE kısıtını index ile ekle (tablo zaten varsa sorun çıkarmaz)
+    try:
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_usage_user_date ON usage(user_id, analysis_date)")
+    except sqlite3.OperationalError:
+        # Aynı anda tekrar çalıştırılırsa diye
+        pass
     conn.commit()
     conn.close()
 
@@ -117,6 +123,7 @@ def check_daily_limit(user_id):
 def increment_usage(user_id):
     today = date.today().isoformat()
     conn = get_connection()
+    # ON CONFLICT artık çalışacak
     conn.execute(
         "INSERT INTO usage (user_id, analysis_date, count) VALUES (?, ?, 1) "
         "ON CONFLICT(user_id, analysis_date) DO UPDATE SET count = count + 1",
