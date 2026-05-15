@@ -2,27 +2,22 @@ import streamlit as st
 from db_utils import init_db, seed_champions
 from logger_config import logger
 from auth_service import AuthService
-import streamlit as st
 
-def load_css():
-    with open("assets/style.css") as f:
-        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
-
-load_css()
 st.set_page_config(page_title="LoL Pick Öneri", page_icon="🎮", layout="centered")
 
-# Veritabanını ve örnek verileri hazırla
+# CSS
+with open("assets/style.css") as f:
+    st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
 init_db()
 seed_champions()
 logger.info("Uygulama başlatıldı.")
 
-# Kullanıcı oturumunu başlat
 if 'user' not in st.session_state:
     st.session_state.user = None
 
 st.title("LoL Takım Sinerji Pick Öneri Aracı")
 
-# ---------- Giriş / Kayıt ----------
 if st.session_state.user is None:
     st.subheader("Giriş Yap")
     with st.form("login"):
@@ -33,14 +28,11 @@ if st.session_state.user is None:
             if user is None:
                 AuthService.create_user(username)
                 user = AuthService.get_user(username)
-            # Admin kullanıcıyı otomatik Pro yap
             if AuthService.is_admin(username):
                 user['is_pro'] = 1
             st.session_state.user = user
             logger.info(f"Kullanıcı giriş yaptı: {username} (Pro: {user['is_pro']})")
             st.rerun()
-
-# ---------- Oturum açık ----------
 else:
     st.success(f"Hoş geldin, **{st.session_state.user['username']}**!")
     if st.session_state.user['is_pro'] or AuthService.is_admin(st.session_state.user['username']):
