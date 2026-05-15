@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
-from db_utils import get_connection
 import streamlit as st
+from db_utils import get_connection
 from logger_config import logger
 
 class ChampionRepository(ABC):
@@ -14,8 +14,7 @@ class SQLiteChampionRepository(ChampionRepository):
         conn = get_connection()
         rows = conn.execute("SELECT * FROM champions").fetchall()
         conn.close()
-        logger.debug(f"{len(rows)} şampiyon veritabanından çekildi.")
+        logger.debug(f"{len(rows)} champions fetched from SQLite")
         return [dict(r) for r in rows]
 
-# Singleton kullanımı
 repo = SQLiteChampionRepository()
