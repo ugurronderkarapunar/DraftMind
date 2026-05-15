@@ -2,54 +2,113 @@
 
 html, body, [class*="css"] {
     font-family: 'Beaufort', sans-serif;
+    background-color: #0A1428;
 }
 
+/* Ana buton */
 .stButton>button {
-    background-color: #C89B3C;
+    background: linear-gradient(135deg, #C89B3C, #A67C00);
     color: #091428;
     border-radius: 8px;
     font-weight: bold;
     border: none;
     transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 1px;
 }
 
 .stButton>button:hover {
-    background-color: #D4A64E;
-    box-shadow: 0 0 10px #C89B3C;
+    background: linear-gradient(135deg, #D4A64E, #C89B3C);
+    box-shadow: 0 0 15px #C89B3C;
+    transform: translateY(-2px);
 }
 
+/* Kartlar */
 .champion-card {
-    background: linear-gradient(135deg, #091428, #0A1428);
+    background: linear-gradient(145deg, #0D1B3E, #091428);
     border: 2px solid #C89B3C;
-    border-radius: 15px;
-    padding: 20px;
+    border-radius: 20px;
+    padding: 25px 15px;
     text-align: center;
     color: #F0E6D2;
-    box-shadow: 0 4px 15px rgba(200, 155, 60, 0.3);
-    transition: transform 0.2s;
+    box-shadow: 0 8px 25px rgba(200, 155, 60, 0.25);
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    position: relative;
+    overflow: hidden;
+}
+
+.champion-card::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(200,155,60,0.1) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity 0.4s;
 }
 
 .champion-card:hover {
-    transform: scale(1.02);
+    transform: translateY(-8px) scale(1.03);
+    box-shadow: 0 15px 35px rgba(200, 155, 60, 0.5);
+    border-color: #F0E6D2;
+}
+
+.champion-card:hover::before {
+    opacity: 1;
 }
 
 .champion-name {
-    font-size: 1.5em;
+    font-size: 1.6em;
     font-weight: bold;
     color: #C89B3C;
+    text-shadow: 0 0 10px rgba(200,155,60,0.5);
 }
 
 .role-badge {
-    background-color: #C89B3C;
+    background: linear-gradient(135deg, #C89B3C, #A67C00);
     color: #091428;
-    padding: 3px 10px;
-    border-radius: 12px;
-    font-size: 0.8em;
-    margin: 5px;
+    padding: 4px 14px;
+    border-radius: 20px;
+    font-size: 0.85em;
+    font-weight: bold;
+    display: inline-block;
+    margin: 8px 0;
 }
 
 .metric-value {
-    font-size: 2em;
+    font-size: 2.2em;
     font-weight: bold;
     color: #00B5A6;
+    text-shadow: 0 0 10px rgba(0,181,166,0.5);
+}
+
+/* Strateji kutusu */
+.strategy-box {
+    background: linear-gradient(135deg, #0D1B3E, #122442);
+    border-left: 4px solid #C89B3C;
+    padding: 20px;
+    margin: 15px 0;
+    border-radius: 8px;
+    color: #F0E6D2;
+}
+
+/* Expand edilebilir bölümler */
+.streamlit-expanderHeader {
+    background-color: #0D1B3E;
+    border-radius: 8px;
+    color: #C89B3C;
+    font-weight: bold;
+}
+
+/* Select box */
+.stSelectbox div[data-baseweb="select"] {
+    background-color: #0D1B3E;
+    border-color: #C89B3C;
+}
+
+/* Spinner */
+.stSpinner > div {
+    border-top-color: #C89B3C !important;
 }
