@@ -4,16 +4,14 @@ from datetime import date
 from logger_config import logger
 
 DB_NAME = "lol_pick.db"
-SECRET_SALT = "LoLSuperSecret2026"  # Güvenli anahtar üretimi için tuz
+SECRET_SALT = "LoLSuperSecret2026"
 
 def get_connection():
-    """Veritabanı bağlantısı oluşturur, satırları sözlük olarak döndürür."""
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = sqlite3.Row
     return conn
 
 def init_db():
-    """Gerekli tabloları ve indeksleri oluşturur (yoksa)."""
     conn = get_connection()
     conn.executescript('''
         CREATE TABLE IF NOT EXISTS champions (
@@ -60,7 +58,6 @@ def init_db():
     logger.info("Veritabanı tabloları kontrol edildi.")
 
 def seed_champions():
-    """Eğer champions tablosu 45 şampiyondan azsa, eksikleri tamamlar."""
     conn = get_connection()
     existing = conn.execute("SELECT COUNT(*) FROM champions").fetchone()[0]
     if existing < 45:
@@ -123,21 +120,18 @@ def seed_champions():
     conn.close()
 
 def get_champions():
-    """Tüm şampiyonları liste olarak döndürür."""
     conn = get_connection()
     rows = conn.execute("SELECT * FROM champions").fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
 def get_user(username):
-    """Kullanıcıyı ada göre getirir."""
     conn = get_connection()
     user = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
     conn.close()
     return dict(user) if user else None
 
 def create_user(username):
-    """Yeni kullanıcı oluşturur."""
     conn = get_connection()
     try:
         conn.execute("INSERT INTO users (username) VALUES (?)", (username,))
@@ -149,7 +143,6 @@ def create_user(username):
         conn.close()
 
 def check_daily_limit(user_id):
-    """Bugünkü analiz sayısını döndürür."""
     today = date.today().isoformat()
     conn = get_connection()
     row = conn.execute(
@@ -160,7 +153,6 @@ def check_daily_limit(user_id):
     return row['count'] if row else 0
 
 def increment_usage(user_id):
-    """Kullanıcının bugünkü analiz sayısını bir artırır."""
     today = date.today().isoformat()
     conn = get_connection()
     conn.execute(
@@ -172,7 +164,6 @@ def increment_usage(user_id):
     conn.close()
 
 def set_pro(username):
-    """Kullanıcıyı Pro üye yapar."""
     conn = get_connection()
     conn.execute("UPDATE users SET is_pro = 1 WHERE username = ?", (username,))
     conn.commit()
@@ -180,7 +171,6 @@ def set_pro(username):
     logger.info(f"{username} Pro üyeliğe yükseltildi.")
 
 def save_feedback(user_id, champion_name, rating):
-    """Geri bildirim kaydeder (rating: 1 veya -1)."""
     conn = get_connection()
     conn.execute(
         "INSERT INTO feedback (user_id, champion_name, rating) VALUES (?, ?, ?)",
@@ -191,6 +181,5 @@ def save_feedback(user_id, champion_name, rating):
     logger.debug(f"Geri bildirim: {user_id} -> {champion_name} ({rating})")
 
 def generate_personal_key(username):
-    """Kullanıcıya özel Pro aktivasyon anahtarı üretir."""
     raw = username + SECRET_SALT
     return hashlib.sha256(raw.encode()).hexdigest()[:12].upper()
