@@ -2,7 +2,13 @@ import streamlit as st
 from db_utils import init_db, seed_champions
 from logger_config import logger
 from auth_service import AuthService
+import streamlit as st
 
+def load_css():
+    with open("assets/style.css") as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
+load_css()
 st.set_page_config(page_title="LoL Pick Öneri", page_icon="🎮", layout="centered")
 
 # Veritabanını ve örnek verileri hazırla
