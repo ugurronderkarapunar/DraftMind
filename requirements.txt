@@ -5,3 +5,4 @@ scikit-learn
 joblib
 plotly
 requests
+openai>=1.0.0
