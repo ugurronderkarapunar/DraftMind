@@ -1,0 +1,55 @@
+@import url('https://fonts.googleapis.com/css2?family=Beaufort:wght@400;700&display=swap');
+
+html, body, [class*="css"] {
+    font-family: 'Beaufort', sans-serif;
+}
+
+.stButton>button {
+    background-color: #C89B3C;
+    color: #091428;
+    border-radius: 8px;
+    font-weight: bold;
+    border: none;
+    transition: all 0.3s ease;
+}
+
+.stButton>button:hover {
+    background-color: #D4A64E;
+    box-shadow: 0 0 10px #C89B3C;
+}
+
+.champion-card {
+    background: linear-gradient(135deg, #091428, #0A1428);
+    border: 2px solid #C89B3C;
+    border-radius: 15px;
+    padding: 20px;
+    text-align: center;
+    color: #F0E6D2;
+    box-shadow: 0 4px 15px rgba(200, 155, 60, 0.3);
+    transition: transform 0.2s;
+}
+
+.champion-card:hover {
+    transform: scale(1.02);
+}
+
+.champion-name {
+    font-size: 1.5em;
+    font-weight: bold;
+    color: #C89B3C;
+}
+
+.role-badge {
+    background-color: #C89B3C;
+    color: #091428;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 0.8em;
+    margin: 5px;
+}
+
+.metric-value {
+    font-size: 2em;
+    font-weight: bold;
+    color: #00B5A6;
+}
