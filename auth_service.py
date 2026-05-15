@@ -4,13 +4,11 @@ from db_utils import get_connection
 from logger_config import logger
 import functools
 
-# Admin kullanıcı adları (büyük/küçük harf duyarsız kontrol edilecek)
 ADMIN_USERS = ["admin", "administrator", "root"]
 
 class AuthService:
     @staticmethod
-    def is_admin(username: str) -> bool:
-        """Verilen kullanıcı adının admin olup olmadığını kontrol eder."""
+    def is_admin(username):
         return username.lower() in [name.lower() for name in ADMIN_USERS]
 
     @staticmethod
@@ -20,7 +18,6 @@ class AuthService:
         conn.close()
         if user:
             user_dict = dict(user)
-            # Admin kullanıcıyı Pro olarak işaretle (veritabanında değilse de)
             if AuthService.is_admin(username):
                 user_dict['is_pro'] = 1
             return user_dict
@@ -40,21 +37,16 @@ class AuthService:
 
     @staticmethod
     def check_daily_limit(user_id, username):
-        # Admin kullanıcılar için limit yok
         if AuthService.is_admin(username):
-            return 0  # hiç kullanılmamış gibi göster
+            return 0
         today = date.today().isoformat()
         conn = get_connection()
-        row = conn.execute(
-            "SELECT count FROM usage WHERE user_id = ? AND analysis_date = ?",
-            (user_id, today)
-        ).fetchone()
+        row = conn.execute("SELECT count FROM usage WHERE user_id = ? AND analysis_date = ?", (user_id, today)).fetchone()
         conn.close()
         return row['count'] if row else 0
 
     @staticmethod
     def increment_usage(user_id, username):
-        # Admin kullanıcıların sayacı artırılmaz
         if AuthService.is_admin(username):
             return
         today = date.today().isoformat()
@@ -76,7 +68,6 @@ class AuthService:
         conn.close()
         logger.info(f"{username} Pro üye oldu.")
 
-# ---------- Yetkilendirme dekoratörleri (güncellenmiş) ----------
 def require_auth(func):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
@@ -90,7 +81,6 @@ def require_pro_or_limit(func):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         user = st.session_state.user
-        # Admin veya Pro üye ise limitsiz erişim
         if not user['is_pro'] and not AuthService.is_admin(user['username']):
             daily = AuthService.check_daily_limit(user['id'], user['username'])
             if daily >= 5:
