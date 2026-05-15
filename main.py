@@ -5,37 +5,53 @@ from auth_service import AuthService
 
 st.set_page_config(page_title="LoL Pick Öneri", page_icon="🎮", layout="centered")
 
+# Veritabanını ve örnek verileri hazırla
 init_db()
 seed_champions()
 logger.info("Uygulama başlatıldı.")
 
+# Kullanıcı oturumunu başlat
 if 'user' not in st.session_state:
     st.session_state.user = None
 
 st.title("LoL Takım Sinerji Pick Öneri Aracı")
 
+# ---------- Giriş / Kayıt ----------
 if st.session_state.user is None:
+    st.subheader("Giriş Yap")
     with st.form("login"):
         username = st.text_input("Kullanıcı adı")
-        if st.form_submit_button("Giriş / Kayıt") and username:
+        login_btn = st.form_submit_button("Giriş / Kayıt")
+        if login_btn and username:
             user = AuthService.get_user(username)
-            if not user:
+            if user is None:
                 AuthService.create_user(username)
                 user = AuthService.get_user(username)
+            # Admin kullanıcıyı otomatik Pro yap
+            if AuthService.is_admin(username):
+                user['is_pro'] = 1
             st.session_state.user = user
-            logger.info(f"Kullanıcı giriş yaptı: {username}")
+            logger.info(f"Kullanıcı giriş yaptı: {username} (Pro: {user['is_pro']})")
             st.rerun()
+
+# ---------- Oturum açık ----------
 else:
     st.success(f"Hoş geldin, **{st.session_state.user['username']}**!")
+    if st.session_state.user['is_pro'] or AuthService.is_admin(st.session_state.user['username']):
+        st.info("👑 Admin/Pro üye – sınırsız analiz hakkına sahipsin.")
+    else:
+        st.info("Ücretsiz üye – günlük 5 analiz hakkın var.")
     if st.button("Çıkış"):
         st.session_state.user = None
         st.rerun()
+
 st.markdown("---")
 st.markdown("""
 ### Nasıl Çalışır?
 1. Banları gir (isteğe bağlı)
-2. Düşman takımını rollerine göre seç
-3. Kendi takımındaki diğer şampiyonları rollerine göre seç
-4. Kendi rolünü belirle, havuzunu daralt, ML seçeneğini aktif et
-5. Analiz et, en iyi 3 pick'i gör ve geri bildirim ver.
+2. Kendi rolünü seç
+3. Düşman takımını rollerine göre belirle
+4. Kendi takımındaki diğer şampiyonları rollerine göre seç
+5. İstersen havuzunu daralt, makine öğrenmesi seçeneğini aç
+6. **Analiz Et** butonuna tıkla, en iyi 3 öneriyi gör!
 """)
