@@ -1,6 +1,5 @@
 import joblib
 import numpy as np
-import pandas as pd
 import os
 
 MODEL_PATH = os.path.join(os.path.dirname(__file__), 'champion_model.pkl')
@@ -13,15 +12,6 @@ class MLPredictor:
             self.model = None
 
     def build_features(self, champ, enemy_champs, ally_champs):
-        """
-        Özellik vektörü:
-        - Aday şampiyonun tüm sayısal özellikleri (10 adet)
-        - Düşman takımın ortalama ve std'leri (10*2 = 20)
-        - Dost takımın ortalama ve std'leri (20)
-        - Düşman hasar tipi dağılımı (AD/AP/Mixed oranları) (3)
-        - Dost takım hasar tipi dağılımı (3)
-        Toplam: ~56 özellik
-        """
         def champ_to_array(c):
             return [c['early_power'], c['late_power'], c['cc_level'], c['tankiness'],
                     c['mobility'], c['burst'], c['armor_mr']]
